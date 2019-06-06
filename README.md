@@ -1,13 +1,28 @@
 # Tf-Keras-Surgeon
-Note: see Keras-Surgeon: https://github.com/BenWhetton/keras-surgeon
+Note: This is a Port for TensorFlow.Keras, for the normal Keras version se the source Project Keras-Surgeon: https://github.com/BenWhetton/keras-surgeon
 
 ## Introduction
-This is a port of Keras-Surgeon by BenWhetton to work with the new TF 2.0 tf.keras which has a few tweaks from normal keras (which causes bugs)
+This is a port of Keras-Surgeon by BenWhetton to work with the new Tensorflow tf.keras and TF 2.0 which has a few differences from normal keras (which causes bugs).
 
+## Goals:
+### Current:
 This is not intended to do anything more than the original, so, most of the code and documentation will remain unchanged.
+It is primarily a port and Bug Fixes.
 
-## From Keras-Surgeon:
-# Keras-Surgeon
+
+### Future:
+Adapt the Code to be modular and extensible such that new code has the option of being a seperate Plugin (under it's own project and license).
+Modules like;
+1. Additional Identifier methods to select which nodes to prune.
+2. Additional Actions or types of pruning (set weights to zero, reinitialize, etc).
+3. Additional layers supported.
+
+
+
+
+
+
+# Keras-Surgeon README:
 
 ## Introduction
 Keras-surgeon provides simple methods for modifying trained 
