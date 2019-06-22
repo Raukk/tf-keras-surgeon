@@ -1,8 +1,11 @@
 # Tf-Keras-Surgeon
-Note: This is a Port for TensorFlow.Keras, for the normal Keras version se the source Project Keras-Surgeon: https://github.com/BenWhetton/keras-surgeon
+Note: This is a Port for TensorFlow.Keras, for the normal Keras version see the source Project Keras-Surgeon: https://github.com/BenWhetton/keras-surgeon
 
 ## Introduction
 This is a port of Keras-Surgeon by BenWhetton to work with the new Tensorflow tf.keras and TF 2.0 which has a few differences from normal keras (which causes bugs).
+
+### Quick Example:
+https://colab.research.google.com/gist/Raukk/49cbf50e564271a6b5f4fc596459d5e9/example_lenet_mnist.ipynb
 
 ## Goals:
 ### Current:
