@@ -10,8 +10,9 @@ from tensorflow.python.keras import backend
 from tensorflow.python.keras import callbacks
 from tensorflow.examples.tutorials import mnist
 
-import tfkerassurgeon
-from tfkerassurgeon import identify
+import tfkerassurgeon.core
+from tfkerassurgeon.core import surgeon
+#from tfkerassurgeon import identify
 from tfkerassurgeon.operations import delete_channels
 
 print(tf.__version__)
@@ -126,10 +127,15 @@ def prune_layer_by_name(model, layer_name):
 def prune_layer(model, layer):
     
     # Get the APOZ (Average Percentage of Zeros) that should identify where we can prune
-    apoz = identify.get_apoz(model, layer, dataset.validation.images)
+    #apoz = identify.get_apoz(model, layer, dataset.validation.images)
 
     # Get the Channel Ids that have a high APOZ, which indicates they can be pruned
-    high_apoz_channels = identify.high_apoz(apoz)
+    high_apoz_channels = [1,2,3,4]#identify.high_apoz(apoz)
+
+
+    # TODO: Replace the above 2 lines of code with an abstraction.
+
+
 
     # Run the pruning on the Model and get the Pruned (uncompiled) model as a result
     model = delete_channels(model, layer, high_apoz_channels)

@@ -24,23 +24,24 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="setup.py" />
+    <Compile Include="src\tfkerassurgeon\core\utils.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="src\tfkerassurgeon\core\__init__.py" />
     <Compile Include="src\tfkerassurgeon\examples\inception_flowers_prune.py" />
     <Compile Include="src\tfkerassurgeon\examples\inception_flowers_tune.py" />
     <Compile Include="src\tfkerassurgeon\examples\lenet_mnist.py" />
     <Compile Include="src\tfkerassurgeon\examples\__init__.py" />
-    <Compile Include="src\tfkerassurgeon\identify.py" />
     <Compile Include="src\tfkerassurgeon\operations.py" />
-    <Compile Include="src\tfkerassurgeon\surgeon.py" />
+    <Compile Include="src\tfkerassurgeon\core\surgeon.py" />
     <Compile Include="src\tfkerassurgeon\utils.py" />
     <Compile Include="src\tfkerassurgeon\__init__.py" />
-    <Compile Include="tests\test_surgeon.py" />
-    <Compile Include="tests\test_utils.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="src\" />
     <Folder Include="src\tfkerassurgeon\" />
     <Folder Include="src\tfkerassurgeon\examples\" />
-    <Folder Include="tests" />
+    <Folder Include="src\tfkerassurgeon\core\" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|PythonCore|3.6" />
