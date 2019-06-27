@@ -43,13 +43,6 @@ def get_node_depth(model, node):
     raise KeyError('The node is not contained in the model.')
 
 
-def check_for_layer_reuse(model, layers=None):
-    """Returns True if any layers are reused, False if not."""
-    if layers is None:
-        layers = model.layers
-    return any([len(get_inbound_nodes(l)) > 1 for l in layers])
-
-
 def find_nodes_in_model(model, layer):
     """Find the indices of layer's inbound nodes which are in model"""
     model_nodes = get_model_nodes(model)
@@ -58,16 +51,6 @@ def find_nodes_in_model(model, layer):
         if node in model_nodes:
             node_indices.append(i)
     return node_indices
-
-
-def check_nodes_in_model(model, nodes):
-    """Check if nodes are in model"""
-    model_nodes = get_model_nodes(model)
-    nodes_in_model = [False] * len(nodes)
-    for i, node in enumerate(nodes):
-        if node in model_nodes:
-            nodes_in_model[i] = True
-    return nodes_in_model
 
 
 def get_model_nodes(model):
@@ -163,22 +146,13 @@ def find_activation_layer(layer, node_index):
             AttributeError('There is no nonlinear activation layer between {0}'
                            ' and {1}'.format(layer.name, maybe_layer.name))
 
-
-def sort_x_by_y(x, y):
-    """Sort the iterable x by the order of iterable y"""
-    x = [x for (_, x) in sorted(zip(y, x))]
-    return x
-
+            
 
 def single_element(x):
     """If x contains a single element, return it; otherwise return x"""
     if len(x) == 1:
         x = x[0]
     return x
-
-
-def bool_to_index(x):
-    return [i for i, v in enumerate(x) if v]
 
 
 def all_equal(iterator):
