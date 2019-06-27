@@ -6,7 +6,7 @@ from tensorflow.python.keras.models import Model
 from tfkerassurgeon import utils
 
 
-def get_apoz(model, layer, x_val, node_indices=None):
+def get_apoz(model, layer, x_val, node_indexes=None):
     """Identify neurons with high Average Percentage of Zeros (APoZ).
 
     The APoZ a.k.a. (A)verage (P)ercentage (o)f activations equal to (Z)ero,
@@ -16,7 +16,7 @@ def get_apoz(model, layer, x_val, node_indices=None):
     `high_apoz()` enables the pruning methodology described in this paper to be
     replicated.
 
-    If node_indices are not specified and the layer is shared within the model
+    If node_indexes are not specified and the layer is shared within the model
     the APoZ will be calculated over all instances of the shared layer.
 
     Args:
@@ -24,7 +24,7 @@ def get_apoz(model, layer, x_val, node_indices=None):
         layer: The layer whose channels will be evaluated for pruning.
         x_val: The input of the validation set. This will be used to calculate
             the activations of the layer of interest.
-        node_indices(list[int]): (optional) A list of node indices.
+        node_indexes(list[int]): (optional) A list of node indices.
 
     Returns:
         List of the APoZ values for each channel in the layer.
@@ -40,20 +40,20 @@ def get_apoz(model, layer, x_val, node_indices=None):
     layer_node_indices = utils.find_nodes_in_model(model, layer)
     # If no nodes are specified, all of the layer's inbound nodes which are
     # in model are selected.
-    if not node_indices:
-        node_indices = layer_node_indices
+    if not node_indexes:
+        node_indexes = layer_node_indices
     # Check for duplicate node indices
-    elif len(node_indices) != len(set(node_indices)):
-        raise ValueError('`node_indices` contains duplicate values.')
+    elif len(node_indexes) != len(set(node_indexes)):
+        raise ValueError('`node_indexes` contains duplicate values.')
     # Check that all of the selected nodes are in the layer
-    elif not set(node_indices).issubset(layer_node_indices):
+    elif not set(node_indexes).issubset(layer_node_indices):
         raise ValueError('One or more nodes specified by `layer` and '
-                         '`node_indices` are not in `model`.')
+                         '`node_indexes` are not in `model`.')
 
     data_format = getattr(layer, 'data_format', 'channels_last')
     # Perform the forward pass and get the activations of the layer.
     mean_calculator = utils.MeanCalculator(sum_axis=0)
-    for node_index in node_indices:
+    for node_index in node_indexes:
         act_layer, act_index = utils.find_activation_layer(layer, node_index)
         # Get activations
         if hasattr(x_val, "__iter__") and not isinstance(x_val, np.ndarray):

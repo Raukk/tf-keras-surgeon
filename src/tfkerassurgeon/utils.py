@@ -1,6 +1,7 @@
 """Utilities used across other modules."""
 import warnings
 import numpy as np
+import collections
 from tensorflow.python.keras.layers import Layer
 from tensorflow.python.keras.activations import linear
 
@@ -22,7 +23,6 @@ def get_channels_attr(layer):
     else:
         raise ValueError('This layer has not got any channels.')
     return channels_attr
-
 
 def get_node_depth(model, node):
     """Get the depth of a node in a model.
@@ -46,11 +46,11 @@ def get_node_depth(model, node):
 def find_nodes_in_model(model, layer):
     """Find the indices of layer's inbound nodes which are in model"""
     model_nodes = get_model_nodes(model)
-    node_indices = []
+    node_indexes = [] # Renamed this since it was confusing with TF/Keras Node.node_indices
     for i, node in enumerate(get_inbound_nodes(layer)):
         if node in model_nodes:
-            node_indices.append(i)
-    return node_indices
+            node_indexes.append(i)
+    return node_indexes
 
 
 def get_model_nodes(model):
@@ -62,15 +62,15 @@ def get_shallower_nodes(node):
     possible_nodes = get_outbound_nodes(node.outbound_layer)
     next_nodes = []
     for n in possible_nodes:
-        for i, node_index in enumerate(n.node_indices):
-            if node == get_inbound_nodes(n.inbound_layers[i])[node_index]:
+        for i, node_index in enumerate(item_to_list(n.node_indices)):
+            if node == get_inbound_nodes(item_to_list(n.inbound_layers)[i])[node_index]:
                 next_nodes.append(n)
     return next_nodes
 
 
 def get_node_inbound_nodes(node):
-    return [get_inbound_nodes(node.inbound_layers[i])[node_index]
-            for i, node_index in enumerate(node.node_indices)]
+    return [get_inbound_nodes(item_to_list(node.inbound_layers)[i])[node_index]
+            for i, node_index in enumerate(item_to_list(node.node_indices))]
 
 
 def get_inbound_nodes(layer):
@@ -147,11 +147,14 @@ def find_activation_layer(layer, node_index):
                            ' and {1}'.format(layer.name, maybe_layer.name))
 
             
-
 def single_element(x):
     """If x contains a single element, return it; otherwise return x"""
-    if len(x) == 1:
+
+    # If the item has a length, and the length is 1, return the object's item, otherwise just return the object
+    if False == hasattr(x, '__len__') or len(x) == 1:
         x = x[0]
+
+    # otherwise just return the item, since it's either not a list at all, or has multiple elements 
     return x
 
 
@@ -163,6 +166,44 @@ def all_equal(iterator):
             np.array_equal(first, rest) for rest in iterator)
     except StopIteration:
         return True
+
+
+def item_to_list(item):
+    """If the item is not a List or Array, this will make it a List with 1 item"""
+    
+    if item is None:
+        return None
+
+    # We don't need to do anything
+    if type(item) is list:
+        return item
+
+    # We'll let it stay an Array stay since it should work the same
+    if isinstance(item, np.ndarray):
+        return item
+
+    # otherwise return a list with just the one element
+    return [item]
+
+
+# Note: this method is not currently used. If it ends up not being needed, then remove it.
+def item_to_np_array(item):
+    """If the item is not a numpy Array, this will make it an Array, if it's not a list, then it will be a 1 lenght Array"""
+
+    if item is None:
+        return None
+
+    # if it's already an Array, we're done
+    if isinstance(item, np.ndarray):
+        return item
+
+    # if its a list, then convert to an Array
+    if type(item) is list:
+        return np.array(item)
+
+    # Otherwise, make it a list with one item and then make that an Array
+    return np.array([item])
+
 
 
 class MeanCalculator:
