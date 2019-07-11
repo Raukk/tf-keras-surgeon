@@ -11,7 +11,7 @@ from tensorflow.python.keras import callbacks
 from tensorflow.examples.tutorials import mnist
 
 import tfkerassurgeon
-from tfkerassurgeon import identify
+from tfkerassurgeon import identify_by_gradient
 from tfkerassurgeon.operations import delete_channels
 
 print(tf.__version__)
@@ -125,14 +125,11 @@ def prune_layer_by_name(model, layer_name):
 # Note: it returns the new, pruned model, that was recompiled
 def prune_layer(model, layer):
     
-    # Get the APOZ (Average Percentage of Zeros) that should identify where we can prune
-    apoz = identify.get_apoz(model, layer, dataset.validation.images)
-
-    # Get the Channel Ids that have a high APOZ, which indicates they can be pruned
-    high_apoz_channels = identify.high_apoz(apoz)
+    # Get the Output Indexes that are indicated as needing to be pruned
+    prune_outputs = identify_by_gradient.get_prune_by_gradient(model, layer, datagen)
 
     # Run the pruning on the Model and get the Pruned (uncompiled) model as a result
-    model = delete_channels(model, layer, high_apoz_channels)
+    model = delete_channels(model, layer, prune_outputs)
 
     # Recompile the model
     compile_model(model)

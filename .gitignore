@@ -11,3 +11,5 @@ dist
 *.swp
 .vs/**
 .suo
+*.h5
+*.user

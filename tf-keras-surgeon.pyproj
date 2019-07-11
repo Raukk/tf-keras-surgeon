@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{b9b64076-5e19-4737-96e7-ecf45a459612}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>src\tfkerassurgeon\examples\lenet_mnist.py</StartupFile>
+    <StartupFile>src\tfkerassurgeon\examples\efficent_lenet_mnist.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -24,11 +24,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="setup.py" />
+    <Compile Include="src\tfkerassurgeon\examples\ExampleDataLoader.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="src\tfkerassurgeon\examples\refactor_efficent_lenet_mnist.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_lenet_mnist.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_eval.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist - Copy.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_fashion_max_pool.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_fashion_eval_graident.py" />
     <Compile Include="src\tfkerassurgeon\examples\inception_flowers_prune.py" />
     <Compile Include="src\tfkerassurgeon\examples\inception_flowers_tune.py" />
+    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_fashion.py" />
     <Compile Include="src\tfkerassurgeon\examples\lenet_mnist.py" />
     <Compile Include="src\tfkerassurgeon\examples\__init__.py" />
     <Compile Include="src\tfkerassurgeon\identify.py" />
+    <Compile Include="src\tfkerassurgeon\identify_by_gradient.py" />
     <Compile Include="src\tfkerassurgeon\operations.py" />
     <Compile Include="src\tfkerassurgeon\surgeon.py" />
     <Compile Include="src\tfkerassurgeon\utils.py" />
