@@ -6,6 +6,10 @@ from tensorflow.python.keras.models import Model
 from tfkerassurgeon import utils
 
 
+#TODO .get_votes(model, layer, data_generator, num_of_batches)
+
+
+
 def get_apoz(model, layer, x_val, num_of_batches = 0, node_indices=None):
     """Identify neurons with high Average Percentage of Zeros (APoZ).
 

@@ -6,6 +6,9 @@ import tensorflow as tf
 
 
 
+#TODO .get_votes(model, layer, data_generator, num_of_batches)
+
+
 def get_gratient_values(model, layer, data_generator, num_of_batches = 100):
     """
     This function identifies the gradient values of the specified layer.
