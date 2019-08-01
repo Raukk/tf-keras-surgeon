@@ -47,7 +47,7 @@ def find_nodes_in_model(model, layer):
     """Find the indices of layer's inbound nodes which are in model"""
     model_nodes = get_model_nodes(model)
     node_indexes = [] # Renamed this since it was confusing with TF/Keras Node.node_indices
-    for i, node in enumerate(get_inbound_nodes(layer)):
+    for i, node in enumerate(single_list(get_inbound_nodes(layer))):
         if node in model_nodes:
             node_indexes.append(i)
     return node_indexes
@@ -62,15 +62,15 @@ def get_shallower_nodes(node):
     possible_nodes = get_outbound_nodes(node.outbound_layer)
     next_nodes = []
     for n in possible_nodes:
-        for i, node_index in enumerate(item_to_list(n.node_indices)):
-            if node == get_inbound_nodes(item_to_list(n.inbound_layers)[i])[node_index]:
+        for i, node_index in enumerate(single_list(n.node_indices)):
+            if node == get_inbound_nodes(single_list(n.inbound_layers)[i])[node_index]:
                 next_nodes.append(n)
     return next_nodes
 
 
 def get_node_inbound_nodes(node):
-    return [get_inbound_nodes(item_to_list(node.inbound_layers)[i])[node_index]
-            for i, node_index in enumerate(item_to_list(node.node_indices))]
+    return [get_inbound_nodes(single_list(node.inbound_layers)[i])[node_index]
+            for i, node_index in enumerate(single_list(node.node_indices))]
 
 
 def get_inbound_nodes(layer):
@@ -104,7 +104,7 @@ def get_nodes_by_depth(model):
 
 
 def get_node_index(node):
-    for i, n in enumerate(get_inbound_nodes(node.outbound_layer)):
+    for i, n in enumerate(single_list(get_inbound_nodes(node.outbound_layer))):
         if node == n:
             return i
 
@@ -118,7 +118,7 @@ def find_activation_layer(layer, node_index):
     """
     output_shape = layer.get_output_shape_at(node_index)
     maybe_layer = layer
-    node = get_inbound_nodes(maybe_layer)[node_index]
+    node = single_list(get_inbound_nodes(maybe_layer))[node_index]
     # Loop will be broken by an error if an output layer is encountered
     while True:
         # If maybe_layer has a nonlinear activation function return it and its index
@@ -136,7 +136,7 @@ def find_activation_layer(layer, node_index):
         if len(next_nodes) > 1:
             ValueError('The model must not branch between the chosen layer'
                        ' and the activation layer.')
-        node = next_nodes[0]
+        node = single_list(next_nodes)[0]
         node_index = get_node_index(node)
         maybe_layer = node.outbound_layer
 
@@ -149,12 +149,20 @@ def find_activation_layer(layer, node_index):
             
 def single_element(x):
     """If x contains a single element, return it; otherwise return x"""
+    try:
+        if len(x) == 1:
+            x = x[0]
+    except TypeError:
+       return x
+    return x
 
-    # If the item has a length, and the length is 1, return the object's item, otherwise just return the object
-    if False == hasattr(x, '__len__') or len(x) == 1:
-        x = x[0]
 
-    # otherwise just return the item, since it's either not a list at all, or has multiple elements 
+def single_list(x):
+    """ If an Element is a single instead of a list, when a list is expected it created a single element list"""
+    try:
+        enumerate(x)
+    except TypeError: 
+        return [x]
     return x
 
 
@@ -166,44 +174,6 @@ def all_equal(iterator):
             np.array_equal(first, rest) for rest in iterator)
     except StopIteration:
         return True
-
-
-def item_to_list(item):
-    """If the item is not a List or Array, this will make it a List with 1 item"""
-    
-    if item is None:
-        return None
-
-    # We don't need to do anything
-    if type(item) is list:
-        return item
-
-    # We'll let it stay an Array stay since it should work the same
-    if isinstance(item, np.ndarray):
-        return item
-
-    # otherwise return a list with just the one element
-    return [item]
-
-
-# Note: this method is not currently used. If it ends up not being needed, then remove it.
-def item_to_np_array(item):
-    """If the item is not a numpy Array, this will make it an Array, if it's not a list, then it will be a 1 lenght Array"""
-
-    if item is None:
-        return None
-
-    # if it's already an Array, we're done
-    if isinstance(item, np.ndarray):
-        return item
-
-    # if its a list, then convert to an Array
-    if type(item) is list:
-        return np.array(item)
-
-    # Otherwise, make it a list with one item and then make that an Array
-    return np.array([item])
-
 
 
 class MeanCalculator:
