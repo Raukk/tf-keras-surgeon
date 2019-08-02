@@ -62,10 +62,9 @@ def get_apoz(model, layer, x_val, node_indexes=None):
             a = temp_model.predict_generator(
                 x_val, x_val.n // x_val.batch_size)
         else:
-            get_activations = k.function(
-                [utils.single_element(model.inputs), k.learning_phase()],
-                [act_layer.get_output_at(act_index)])
-            a = get_activations([x_val, 0])[0]
+            get_activations = k.function(model.input, act_layer.output)
+
+            a = get_activations([x_val, 0])
             # Ensure that the channels axis is last
         if data_format == 'channels_first':
             a = np.swapaxes(a, 1, -1)

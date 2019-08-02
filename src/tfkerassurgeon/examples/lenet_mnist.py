@@ -155,8 +155,6 @@ def prune_layer(model, layer):
     return model
 
 
-
-
 # the main function, that runs the training
 def main(): 
 
