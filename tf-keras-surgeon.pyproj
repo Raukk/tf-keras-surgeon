@@ -24,7 +24,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="setup.py" />
-    <Compile Include="src\tfkerassurgeon\examples\ExampleDataLoader.py">
+    <Compile Include="src\tfkerassurgeon\democratic_selector.py" />
+    <Compile Include="src\tfkerassurgeon\examples\compressed_mnist.py" />
+    <Compile Include="src\tfkerassurgeon\examples\example_data_loader.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="src\tfkerassurgeon\examples\quick_check.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="src\tfkerassurgeon\examples\refactor_efficent_lenet_mnist.py" />
@@ -32,16 +37,20 @@
     <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_eval.py" />
     <Compile Include="src\tfkerassurgeon\examples\efficent_mnist - Copy.py" />
     <Compile Include="src\tfkerassurgeon\examples\efficent_mnist.py" />
-    <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_fashion_max_pool.py" />
     <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_fashion_eval_graident.py" />
     <Compile Include="src\tfkerassurgeon\examples\inception_flowers_prune.py" />
     <Compile Include="src\tfkerassurgeon\examples\inception_flowers_tune.py" />
     <Compile Include="src\tfkerassurgeon\examples\efficent_mnist_fashion.py" />
     <Compile Include="src\tfkerassurgeon\examples\lenet_mnist.py" />
     <Compile Include="src\tfkerassurgeon\examples\__init__.py" />
+    <Compile Include="src\tfkerassurgeon\identifier.py" />
+    <Compile Include="src\tfkerassurgeon\identify_by_apoz.py" />
     <Compile Include="src\tfkerassurgeon\identify.py" />
+    <Compile Include="src\tfkerassurgeon\identify_by_duplicate.py" />
+    <Compile Include="src\tfkerassurgeon\identify_by_weight_dupe.py" />
     <Compile Include="src\tfkerassurgeon\identify_by_gradient.py" />
     <Compile Include="src\tfkerassurgeon\operations.py" />
+    <Compile Include="src\tfkerassurgeon\selector.py" />
     <Compile Include="src\tfkerassurgeon\surgeon.py" />
     <Compile Include="src\tfkerassurgeon\utils.py" />
     <Compile Include="src\tfkerassurgeon\__init__.py" />

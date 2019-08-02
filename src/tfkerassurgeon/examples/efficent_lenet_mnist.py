@@ -24,6 +24,8 @@ from tfkerassurgeon import surgeon
 
 from tfkerassurgeon import identify_by_gradient
 
+from tfkerassurgeon import identify_by_duplicate
+
 from tfkerassurgeon import identify
 
 from tfkerassurgeon.operations import delete_channels
@@ -52,7 +54,7 @@ tf.keras.backend.set_session(sess)
 # Set some static values that can be tweaked to experiment
 # Constants
 
-file_name_prefix = "LeNet_4_"
+file_name_prefix = "Test_Pruning_Dupe_2_"
 
 keras_verbosity = 0
 
@@ -60,18 +62,55 @@ input_shape = (28, 28, 1)
 
 nb_classes = 10
 
-batch_size = 256
+batch_size = 128#4096
 
-epochs = 5
+epochs = 1000 # note: using callbacks means it should stop well before any of these happen.
 
 num_of_full_passes = 10
 
-cutoff_acc = 0.99
+cutoff_acc = 0.0909
 
 num_of_batches = 10 # This is probably way to low to get a good value
 
-
 layers = tf.keras.layers
+
+all_callbacks = [
+                    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
+                    keras.callbacks.ReduceLROnPlateau(monitor='val_loss', patience=2, cooldown=5)
+                ]
+
+
+
+def grab_plain_batch(batch_size, X_train, Y_train):
+    # get the files iterator
+    size_batch = batch_size
+    last_index = len(X_train) - 1
+    x_train = X_train
+    y_train = Y_train
+
+    # continue indefinitly
+    while True:
+
+        # return one batch at a time
+        batch_data = [[],[]]
+        for i in range(0, size_batch):
+            # just grab items randomly from the training data
+            random_index = random.randint(0, last_index)
+            batch_data[0].append(x_train[random_index])
+            batch_data[1].append(y_train[random_index])
+
+        yield (np.array(batch_data[0]), np.array(batch_data[1]))
+
+
+def compile(model):
+
+    new_adam = tf.keras.optimizers.Adam(clipnorm=2.0)
+
+    model.compile(optimizer=new_adam,
+                    loss='categorical_crossentropy',
+                    metrics=['accuracy'])
+
+print("Using ClipNorm of 2")
 
 
 # Get the MNIST Dataset
@@ -114,28 +153,9 @@ datagen = datagen.flow(X_train, Y_train, batch_size=batch_size)
 first_batch = next(datagen)
 
 
-def grab_train_batch(batch_size, X_train, Y_train):
-    # get the files iterator
-    size_batch = batch_size
-    last_index = len(X_train) - 1
-    x_train = X_train
-    y_train = Y_train
-
-    # continue indefinitly
-    while True:
-
-        # return one batch at a time
-        batch_data = [[],[]]
-        for i in range(0, size_batch):
-            # just grab items randomly from the training data
-            random_index = random.randint(0, last_index)
-            batch_data[0].append(x_train[random_index])
-            batch_data[1].append(y_train[random_index])
-
-        yield (np.array(batch_data[0]), np.array(batch_data[1]))
-
-train_batcher = grab_train_batch(batch_size, X_train, Y_train)
-first_batch = next(train_batcher)
+train_batcher = grab_plain_batch(batch_size, X_train, Y_train)
+test_batcher = grab_plain_batch(batch_size, X_test, Y_test)
+#first_batch = next(train_batcher)
 
 # Lets print of the first image just to be sure everything loaded
 
@@ -149,19 +169,16 @@ first_batch = next(train_batcher)
 
 model = tf.keras.models.Sequential()
 
-model.add(layers.Conv2D(512, (3, 3), input_shape=(28, 28, 1), activation='relu', name='conv_1'))
+model.add(layers.Conv2D(64, (3, 3), input_shape=(28, 28, 1), activation='relu', name='conv_1'))
 model.add(layers.MaxPool2D())
-model.add(layers.Conv2D(256, (3, 3), activation='relu', name='conv_2'))
+model.add(layers.Conv2D(64, (3, 3), activation='relu', name='conv_2'))
 model.add(layers.MaxPool2D())
 #model.add(layers.Permute((2, 1, 3)))
 model.add(layers.Flatten())
-model.add(layers.Dense(128, activation='relu', name='dense_1'))
+model.add(layers.Dense(64, activation='relu', name='dense_1'))
 model.add(layers.Dense(10, activation='softmax', name='dense_2'))
 
-model.compile(optimizer='adam',
-                    loss='categorical_crossentropy',
-                    metrics=['accuracy'])
-
+compile(model)
 #model.summary()
 
 
@@ -176,30 +193,42 @@ model.save(file_name_prefix+'checkpoint_raw_weights.h5')
 model.summary()
 
 # Recompile the model
-model.compile(optimizer='adam',
-                loss='categorical_crossentropy',
-                metrics=['accuracy'])
+compile(model)
 
 # run it through everything num_of_full_passes times for good measure
 for full_pass_id in range(1, num_of_full_passes + 1):
 
+  escape_loop = False
+
   # list off the layers we are pruning and the order that we should prune them
-  prune_targets = ['dense_1', 'conv_2', 'conv_1']
+  prune_targets = ['conv_1']#, 'conv_2', 'dense_1']
+  # suffle the list because sometimes it gets one layer pruned too much and that stops the rest
+  random.shuffle(prune_targets)
+  print("Starting Pass ", full_pass_id)
 
-  print("Starting Pass ",full_pass_id)
+  # this will run until the exit condition is hit
+  while (escape_loop != True):
 
-  # prune each layer one at a time
-  for prune_target in prune_targets:
+    # prune each layer one at a time
+    for prune_target in prune_targets:
 
-    # this will run until the exit condition is hit
-    while (True):
+      print("Starting Prune for Layer: ", prune_target)
+
       # Run the training
       #model.fit(X_train, Y_train, epochs=epochs, batch_size=batch_size,
       #    verbose=keras_verbosity, validation_data=(X_test, Y_test))
       
       start_time = time.time()
-      model.fit_generator(datagen, steps_per_epoch=256, epochs=(epochs + full_pass_id), verbose=keras_verbosity,
-                 max_queue_size=1000, workers=1)
+
+      model.fit_generator(datagen, 
+                          validation_data = test_batcher,
+                          steps_per_epoch=256, 
+                          epochs=epochs,
+                          verbose=keras_verbosity,
+                          max_queue_size=10000, 
+                          workers=1, 
+                          callbacks = all_callbacks)
+
       print("Fit took %s seconds" % (time.time() - start_time))
 
       # Then Print the Training Results
@@ -207,8 +236,8 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       print('Test score:', score[0])
       print('Test accuracy:', score[1])
 
-      # check the score did not fall below the threshold, if so, undo the change
-      if (score[1] < cutoff_acc):
+      # check the score did not fall below the threshold, if so, undo the change # Round the value to 3 decimal places, it's stupid to stop because its 0.0004 below
+      if (round(score[1], 3) < cutoff_acc):
         print("Score was below the Cutoff. ", score[1], cutoff_acc)
 
         # Clear everything from memory
@@ -221,10 +250,10 @@ for full_pass_id in range(1, num_of_full_passes + 1):
         model.summary()
 
         # Recompile the model
-        model.compile(optimizer='adam',
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
+        compile(model)
 
+        # break out of this loop, to do the next 
+        escape_loop = True
         break
       # if the accuracy is good, then prune it
 
@@ -250,7 +279,7 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       layer = model.get_layer(name = prune_target)
      
       # set the Prune intensity to slowly increase as we go further 
-      prune_intensity = (float(full_pass_id) / float(num_of_full_passes))
+      prune_intensity = (float(full_pass_id) / float(num_of_full_passes)) + 0.05
       print("Using pruning intensity: ", prune_intensity)
 
 
@@ -263,7 +292,19 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       temp = identify_by_gradient.get_prune_by_gradient(model, layer, datagen, prune_intensity = prune_intensity, num_of_batches = num_of_batches)
       print(len(temp))
       prune_layer_outputs_votes = prune_layer_outputs_votes + list(temp)
-      
+
+
+      start_time = time.time()
+
+      temp = identify_by_duplicate.get_duplicate_scores(model, layer, datagen, batch_size, num_of_batches = num_of_batches)
+      print(len(temp))
+      print(temp)
+
+      print("get_duplicate_scores took %s seconds" % (time.time() - start_time))
+      print("get_duplicate_scores took per batch %s seconds" % float((time.time() - start_time) / num_of_batches))
+
+      raise Exception("Forced stop")
+
       #print(len(prune_layer_outputs_votes))
       #print("Starting APOZ identification using augmented data")
 
@@ -279,7 +320,12 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       temp = identify_by_gradient.get_prune_by_gradient(model, layer, train_batcher, prune_intensity = prune_intensity, num_of_batches = num_of_batches)
       print(len(temp))
       prune_layer_outputs_votes = prune_layer_outputs_votes + list(temp)
+     
       
+      temp = identify_by_duplicate.get_duplicate_scores(model, layer, train_batcher, batch_size, num_of_batches = num_of_batches)
+      print(len(temp))
+      print(temp)
+
       #print(len(prune_layer_outputs_votes))
       print("Starting APOZ identification using non-augmented data")
 
@@ -313,10 +359,10 @@ for full_pass_id in range(1, num_of_full_passes + 1):
         model.summary()
 
         # Recompile the model
-        model.compile(optimizer='adam',
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
+        compile(model)
+
         # break out of this loop, to do the next 
+        escape_loop = True
         break
 
 
@@ -349,10 +395,10 @@ for full_pass_id in range(1, num_of_full_passes + 1):
         model.summary()
 
         # Recompile the model
-        model.compile(optimizer='adam',
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
+        compile(model)
+
         # break out of this loop, to do the next 
+        escape_loop = True
         break
         
 
@@ -367,19 +413,19 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       model = tf.keras.models.load_model(file_name_prefix+'pruned_raw_weights.h5')
 
       # Recompile the model
-      model.compile(optimizer='adam',
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
+      compile(model)
 
       print("Loop finished.")
 
 
 # One final training to make sure it fits well
 model.fit_generator(datagen,
+        validation_data = test_batcher,
         steps_per_epoch=256,
-        epochs=int(2*epochs),
-        verbose=keras_verbosity,
-        validation_data=(X_test, Y_test)
+        epochs=epochs,
+        verbose=1,
+        validation_data=(X_test, Y_test),
+        callbacks = all_callbacks
         )
 
 
@@ -420,9 +466,7 @@ model.add(layers.Flatten())
 model.add(layers.Dense(500, activation='relu', name='dense_1'))
 model.add(layers.Dense(10, activation='softmax', name='dense_2'))
 
-model.compile(optimizer='adam',
-                    loss='categorical_crossentropy',
-                    metrics=['accuracy'])
+compile(model)
 
 model.summary()
 
@@ -437,8 +481,9 @@ model.fit(
           Y_train,
           epochs=epochs,
           batch_size=batch_size,
-          verbose=keras_verbosity,
-          validation_data=(X_test, Y_test)
+          verbose=1,
+          validation_data=(X_test, Y_test),
+          callbacks = all_callbacks
          )
 
 
