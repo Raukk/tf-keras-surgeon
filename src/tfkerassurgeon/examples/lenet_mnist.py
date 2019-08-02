@@ -1,6 +1,8 @@
 import sys
 sys.path.append("../../")
 
+import numpy as np
+
 import tensorflow as tf
 
 from tensorflow.python.keras import layers
@@ -8,8 +10,8 @@ from tensorflow.python.keras import activations
 from tensorflow.python.keras import models
 from tensorflow.python.keras import backend
 from tensorflow.python.keras import callbacks
-from tensorflow.examples.tutorials import mnist
-
+from tensorflow.python.keras.datasets import mnist
+from tensorflow.python.keras.utils.np_utils import to_categorical
 import tfkerassurgeon
 from tfkerassurgeon import identify
 from tfkerassurgeon.operations import delete_channels
@@ -23,8 +25,24 @@ epochs=200 # we'd never reach 200 because we have early stopping
 batch_size=128 # tweak this depending on your hardware and Model
 
 
-# Load dataset (it will automatically download it if needed)
-dataset = mnist.input_data.read_data_sets('tempData', one_hot=True, reshape=False)
+# Load the dataset (it will automatically download it if needed), they provided a nice helper that does all the network and downloading for you
+(X_train, Y_train), (X_test, Y_test) = mnist.load_data()
+# This is an leterantive to the MNIST numbers dataset that is a computationlally harder problem
+#(X_train, Y_train), (X_test, Y_test) = keras.datasets.fashion_mnist.load_data()
+
+# we need to make sure that the images are normalized and in the right format
+X_train = X_train.astype('float32')
+X_test = X_test.astype('float32')
+X_train /= 255
+X_test /= 255
+
+# expand the dimensions to get the shape to (samples, height, width, channels) where greyscale has 1 channel
+X_train = np.expand_dims(X_train, axis=-1)
+X_test = np.expand_dims(X_test, axis=-1)
+
+# one-hot encoding, this way, each digit has a probability output
+Y_train = to_categorical(Y_train, 10)
+Y_test = to_categorical(Y_test, 10)
 
 
 # Simple reusable shorthand to compile the model, so that we can be sure to use the same optomizer, loss, and metrics
@@ -33,7 +51,6 @@ def compile_model(model):
     model.compile(optimizer='adam',
                     loss='categorical_crossentropy',
                     metrics=['accuracy'])
-
 
 
 # method that encapsulates the Models archeteture and construction
@@ -91,20 +108,20 @@ callback_list = get_callbacks()
 def fit_model(model):
     
     return model.fit(
-                    dataset.train.images,
-                    dataset.train.labels,
+                    X_train,
+                    Y_train,
                     epochs=epochs,
                     batch_size=batch_size,
                     verbose=keras_verbosity,
-                    validation_data=(dataset.validation.images, dataset.validation.labels),
+                    validation_data=(X_test, Y_test),
                     callbacks=callback_list)
 
 # Simple reusable shorthand for evaluating the model on the Validation set 
 def eval_model(model):
 
     return model.evaluate(
-                        dataset.validation.images, 
-                        dataset.validation.labels, 
+                        X_test, 
+                        Y_test, 
                         batch_size=batch_size, 
                         verbose=keras_verbosity)
 
@@ -118,15 +135,13 @@ def prune_layer_by_name(model, layer_name):
     return prune_layer(model, layer)
 
 
-
-
 # THIS IS WHERE THE MAGIC HAPPENS!
 # This method uses the Keras Surgeon to identify which parts od a layer can be pruned and then deletes them
 # Note: it returns the new, pruned model, that was recompiled
 def prune_layer(model, layer):
     
     # Get the APOZ (Average Percentage of Zeros) that should identify where we can prune
-    apoz = identify.get_apoz(model, layer, dataset.validation.images)
+    apoz = identify.get_apoz(model, layer, X_test)
 
     # Get the Channel Ids that have a high APOZ, which indicates they can be pruned
     high_apoz_channels = identify.high_apoz(apoz)
