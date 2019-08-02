@@ -1,6 +1,7 @@
 """Utilities used across other modules."""
 import warnings
 import numpy as np
+import collections
 from tensorflow.python.keras.layers import Layer
 from tensorflow.python.keras.activations import linear
 
@@ -23,7 +24,6 @@ def get_channels_attr(layer):
         raise ValueError('This layer has not got any channels.')
     return channels_attr
 
-
 def get_node_depth(model, node):
     """Get the depth of a node in a model.
 
@@ -43,31 +43,14 @@ def get_node_depth(model, node):
     raise KeyError('The node is not contained in the model.')
 
 
-def check_for_layer_reuse(model, layers=None):
-    """Returns True if any layers are reused, False if not."""
-    if layers is None:
-        layers = model.layers
-    return any([len(get_inbound_nodes(l)) > 1 for l in layers])
-
-
 def find_nodes_in_model(model, layer):
     """Find the indices of layer's inbound nodes which are in model"""
     model_nodes = get_model_nodes(model)
-    node_indices = []
-    for i, node in enumerate(get_inbound_nodes(layer)):
+    node_indexes = [] # Renamed this since it was confusing with TF/Keras Node.node_indices
+    for i, node in enumerate(single_list(get_inbound_nodes(layer))):
         if node in model_nodes:
-            node_indices.append(i)
-    return node_indices
-
-
-def check_nodes_in_model(model, nodes):
-    """Check if nodes are in model"""
-    model_nodes = get_model_nodes(model)
-    nodes_in_model = [False] * len(nodes)
-    for i, node in enumerate(nodes):
-        if node in model_nodes:
-            nodes_in_model[i] = True
-    return nodes_in_model
+            node_indexes.append(i)
+    return node_indexes
 
 
 def get_model_nodes(model):
@@ -79,15 +62,15 @@ def get_shallower_nodes(node):
     possible_nodes = get_outbound_nodes(node.outbound_layer)
     next_nodes = []
     for n in possible_nodes:
-        for i, node_index in enumerate(n.node_indices):
-            if node == get_inbound_nodes(n.inbound_layers[i])[node_index]:
+        for i, node_index in enumerate(single_list(n.node_indices)):
+            if node == get_inbound_nodes(single_list(n.inbound_layers)[i])[node_index]:
                 next_nodes.append(n)
     return next_nodes
 
 
 def get_node_inbound_nodes(node):
-    return [get_inbound_nodes(node.inbound_layers[i])[node_index]
-            for i, node_index in enumerate(node.node_indices)]
+    return [get_inbound_nodes(single_list(node.inbound_layers)[i])[node_index]
+            for i, node_index in enumerate(single_list(node.node_indices))]
 
 
 def get_inbound_nodes(layer):
@@ -121,7 +104,7 @@ def get_nodes_by_depth(model):
 
 
 def get_node_index(node):
-    for i, n in enumerate(get_inbound_nodes(node.outbound_layer)):
+    for i, n in enumerate(single_list(get_inbound_nodes(node.outbound_layer))):
         if node == n:
             return i
 
@@ -135,7 +118,7 @@ def find_activation_layer(layer, node_index):
     """
     output_shape = layer.get_output_shape_at(node_index)
     maybe_layer = layer
-    node = get_inbound_nodes(maybe_layer)[node_index]
+    node = single_list(get_inbound_nodes(maybe_layer))[node_index]
     # Loop will be broken by an error if an output layer is encountered
     while True:
         # If maybe_layer has a nonlinear activation function return it and its index
@@ -153,7 +136,7 @@ def find_activation_layer(layer, node_index):
         if len(next_nodes) > 1:
             ValueError('The model must not branch between the chosen layer'
                        ' and the activation layer.')
-        node = next_nodes[0]
+        node = single_list(next_nodes)[0]
         node_index = get_node_index(node)
         maybe_layer = node.outbound_layer
 
@@ -163,22 +146,24 @@ def find_activation_layer(layer, node_index):
             AttributeError('There is no nonlinear activation layer between {0}'
                            ' and {1}'.format(layer.name, maybe_layer.name))
 
-
-def sort_x_by_y(x, y):
-    """Sort the iterable x by the order of iterable y"""
-    x = [x for (_, x) in sorted(zip(y, x))]
-    return x
-
-
+            
 def single_element(x):
     """If x contains a single element, return it; otherwise return x"""
-    if len(x) == 1:
-        x = x[0]
+    try:
+        if len(x) == 1:
+            x = x[0]
+    except TypeError:
+       return x
     return x
 
 
-def bool_to_index(x):
-    return [i for i, v in enumerate(x) if v]
+def single_list(x):
+    """ If an Element is a single instead of a list, when a list is expected it created a single element list"""
+    try:
+        enumerate(x)
+    except TypeError: 
+        return [x]
+    return x
 
 
 def all_equal(iterator):

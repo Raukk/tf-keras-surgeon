@@ -52,7 +52,7 @@ class Surgeon:
                            'delete_channels')
 
     def add_job(self, job, layer, *,
-                channels=None, new_layer=None, node_indices=None):
+                channels=None, new_layer=None, node_indexes=None):
         """Adds a job for the Surgeon to perform on the model.
 
         Job options are:
@@ -76,10 +76,10 @@ class Surgeon:
                                  Used in `delete_channels`.
             new_layer(Layer): A new layer used for the job. Used in
                               `insert_layer` and `replace_layer`.
-            node_indices(list[int]): (optional) A list of node indices used to
+            node_indexes(list[int]): (optional) A list of node indices used to
                                     selectively apply the job to a subset of
                                     the layer's nodes. Nodes are selected with:
-                                    node[i] = layer.inbound_nodes[node_indices[i]]
+                                    node[i] = layer.inbound_nodes[node_indexes[i]]
         """
         # If the model has been copied, identify `layer` in the copied model.
         if self._copy:
@@ -91,22 +91,22 @@ class Surgeon:
         layer_node_indices = utils.find_nodes_in_model(self.model, layer)
         # If no nodes are specified, all of the layer's inbound nodes which are
         # in model are selected.
-        if not node_indices:
-            node_indices = layer_node_indices
+        if not node_indexes:
+            node_indexes = layer_node_indices
         # Check for duplicate node indices
-        elif len(node_indices) != len(set(node_indices)):
-            raise ValueError('`node_indices` contains duplicate values.')
+        elif len(node_indexes) != len(set(node_indexes)):
+            raise ValueError('`node_indexes` contains duplicate values.')
         # Check that all of the selected nodes are in the layer
-        elif not set(node_indices).issubset(layer_node_indices):
+        elif not set(node_indexes).issubset(layer_node_indices):
             raise ValueError('One or more nodes specified by `layer` and '
-                             '`node_indices` are not in `model`.')
+                             '`node_indexes` are not in `model`.')
 
         # Select the modification function and any keyword arguments.
         kwargs = {}
         if job == 'delete_channels':
             # If not all inbound_nodes are selected, the new layer is renamed
             # to avoid duplicate layer names.
-            if set(node_indices) != set(layer_node_indices):
+            if set(node_indexes) != set(layer_node_indices):
                 kwargs['layer_name'] = layer.name + '_' + job
             kwargs['channels'] = channels
             mod_func = self._delete_channels
@@ -128,7 +128,7 @@ class Surgeon:
 
         # Get nodes to be operated on for this job
         job_nodes = []
-        for node_index in node_indices:
+        for node_index in node_indexes:
             job_nodes.append(get_inbound_nodes(layer)[node_index])
         # Check that the nodes do not already have jobs assigned to them.
         if set(job_nodes).intersection(self.nodes):
