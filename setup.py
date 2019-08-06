@@ -6,7 +6,7 @@ from setuptools import find_packages
 
 setup(
     name='tfkerassurgeon',
-    version="0.2.0",
+    version="0.2.2",
     url='https://github.com/Raukk/tf-keras-surgeon',
     license='MIT',
     description='A library for performing network surgery on trained tf.Keras '

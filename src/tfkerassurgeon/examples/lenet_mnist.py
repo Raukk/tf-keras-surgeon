@@ -11,8 +11,12 @@ from tensorflow.python.keras import callbacks
 from tensorflow.examples.tutorials import mnist
 
 import tfkerassurgeon
-from tfkerassurgeon import identify_by_gradient
+from tfkerassurgeon import identify
 from tfkerassurgeon.operations import delete_channels
+
+from tfkerassurgeon.identify_by_apoz import ApozIdentifier
+
+apoz_identifier = ApozIdentifier()
 
 print(tf.__version__)
 
@@ -25,6 +29,16 @@ batch_size=128 # tweak this depending on your hardware and Model
 
 # Load dataset (it will automatically download it if needed)
 dataset = mnist.input_data.read_data_sets('tempData', one_hot=True, reshape=False)
+
+
+
+# Create a datagenerator 
+datagen = tf.keras.preprocessing.image.ImageDataGenerator(width_shift_range=4, height_shift_range=4, horizontal_flip=False, vertical_flip=False, fill_mode = 'constant', cval = 0.0)
+
+datagen.fit(dataset.train.images)
+
+datagen = datagen.flow(dataset.train.images, dataset.train.labels, batch_size=batch_size)
+
 
 
 # Simple reusable shorthand to compile the model, so that we can be sure to use the same optomizer, loss, and metrics
@@ -51,7 +65,7 @@ def build_model():
     model.add(layers.MaxPool2D())
     model.add(layers.Permute((2, 1, 3)))
     model.add(layers.Flatten())
-    model.add(layers.Dense(500, activation='relu', name='dense_1'))
+    model.add(layers.Dense(50, activation='relu', name='dense_1'))
     model.add(layers.Dense(10, activation='softmax', name='dense_2'))
 
     compile_model(model)
@@ -126,10 +140,18 @@ def prune_layer_by_name(model, layer_name):
 def prune_layer(model, layer):
     
     # Get the Output Indexes that are indicated as needing to be pruned
-    prune_outputs = identify_by_gradient.get_prune_by_gradient(model, layer, datagen)
+    prune_outputs = identify.get_apoz(model, layer, dataset.validation.images)
+    print(prune_outputs)
+
+    prune_votes = apoz_identifier.get_votes(model, layer, datagen)
+    
+    print(prune_votes)
+        
+    high_apoz_channels = identify.high_apoz(prune_outputs)
+    print(high_apoz_channels)
 
     # Run the pruning on the Model and get the Pruned (uncompiled) model as a result
-    model = delete_channels(model, layer, prune_outputs)
+    model = delete_channels(model, layer, high_apoz_channels)
 
     # Recompile the model
     compile_model(model)

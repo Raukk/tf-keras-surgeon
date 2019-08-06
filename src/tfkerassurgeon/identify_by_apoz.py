@@ -1,4 +1,4 @@
-"""Identify which channels to delete."""
+"""Identify which channels to delete. Based on APoZ a.k.a. (A)verage (P)ercentage (o)f activations equal to (Z)ero"""
 
 import numpy as np
 from tensorflow.python.keras import backend as k
@@ -57,10 +57,6 @@ class ApozIdentifier:
         # Check for duplicate node indices
         if len(node_indices) != len(set(node_indices)):
             raise ValueError('`node_indices` contains duplicate values.')
-        # Check that all of the selected nodes are in the layer
-        elif not set(node_indices).issubset(layer_node_indices):
-            raise ValueError('One or more nodes specified by `layer` and '
-                             '`node_indices` are not in `model`.')
 
         data_format = getattr(layer, 'data_format', 'channels_last')
 
