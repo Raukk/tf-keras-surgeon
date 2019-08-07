@@ -33,7 +33,7 @@ class InverseGradientIdentifier:
 
         """
 
-        return self.get_prune_by_gradient(model, layer, data_generator, num_of_batches)
+        return self.get_gratient_values(model, layer, data_generator, num_of_batches)
 
     def get_gratient_values(self, model, layer, data_generator, num_of_batches = 10):
         """

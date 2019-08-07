@@ -22,13 +22,14 @@ import tfkerassurgeon
 
 from tfkerassurgeon import surgeon
 
-from tfkerassurgeon import identify_by_gradient
+from tfkerassurgeon.democratic_selector import DemocraticSelector
 
-from tfkerassurgeon import identify_by_duplicate
-
-from tfkerassurgeon import identify
+from tfkerassurgeon.identify_by_apoz import ApozIdentifier
+from tfkerassurgeon.identify_by_duplicate import DuplicateActivationIdentifier
+from tfkerassurgeon.identify_by_gradient import InverseGradientIdentifier
 
 from tfkerassurgeon.operations import delete_channels
+
 
 # set basic values
 print(tf.__version__)
@@ -54,7 +55,7 @@ tf.keras.backend.set_session(sess)
 # Set some static values that can be tweaked to experiment
 # Constants
 
-file_name_prefix = "Test_Pruning_Dupe_2_"
+file_name_prefix = "Test_Pruning_All_2_"
 
 keras_verbosity = 0
 
@@ -68,7 +69,7 @@ epochs = 1000 # note: using callbacks means it should stop well before any of th
 
 num_of_full_passes = 10
 
-cutoff_acc = 0.0909
+cutoff_acc = 0.99
 
 num_of_batches = 10 # This is probably way to low to get a good value
 
@@ -76,8 +77,9 @@ layers = tf.keras.layers
 
 all_callbacks = [
                     tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
-                    keras.callbacks.ReduceLROnPlateau(monitor='val_loss', patience=2, cooldown=5)
+                    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', patience=2, cooldown=5)
                 ]
+
 
 
 
@@ -150,15 +152,18 @@ datagen.fit(X_train)
 
 datagen = datagen.flow(X_train, Y_train, batch_size=batch_size)
 
-first_batch = next(datagen)
-
 
 train_batcher = grab_plain_batch(batch_size, X_train, Y_train)
 test_batcher = grab_plain_batch(batch_size, X_test, Y_test)
-#first_batch = next(train_batcher)
+
+identifiers = [#ApozIdentifier(),
+               DuplicateActivationIdentifier(batch_size),
+               InverseGradientIdentifier(0.15)]
+
+selector = DemocraticSelector(identifiers, [train_batcher, datagen], num_of_batches=10)
 
 # Lets print of the first image just to be sure everything loaded
-
+#first_batch = next(train_batcher)
 #print(np.argmax(first_batch[1][0]))
 
 #plt.imshow(np.squeeze(first_batch[0][0], axis=-1), cmap='gray', interpolation='none')
@@ -169,13 +174,18 @@ test_batcher = grab_plain_batch(batch_size, X_test, Y_test)
 
 model = tf.keras.models.Sequential()
 
-model.add(layers.Conv2D(64, (3, 3), input_shape=(28, 28, 1), activation='relu', name='conv_1'))
+model.add(layers.Conv2D(256, (3, 3), input_shape=(28, 28, 1), activation='relu', name='conv_1'))
+model.add(layers.SpatialDropout2D(0.25))
+#model.add(layers.BatchNormalization())
 model.add(layers.MaxPool2D())
-model.add(layers.Conv2D(64, (3, 3), activation='relu', name='conv_2'))
+model.add(layers.Conv2D(256, (3, 3), activation='relu', name='conv_2'))
+model.add(layers.SpatialDropout2D(0.25))
+#model.add(layers.BatchNormalization())
 model.add(layers.MaxPool2D())
-#model.add(layers.Permute((2, 1, 3)))
 model.add(layers.Flatten())
-model.add(layers.Dense(64, activation='relu', name='dense_1'))
+model.add(layers.Dense(256, activation='relu', name='dense_1'))
+model.add(layers.Dropout(0.25))
+#model.add(layers.BatchNormalization())
 model.add(layers.Dense(10, activation='softmax', name='dense_2'))
 
 compile(model)
@@ -184,13 +194,14 @@ compile(model)
 
 # We're going to loop through the pruning process multiple times
 # We're Going to prune them one layer at a time. 
-model.save(file_name_prefix+'raw_weights.h5') 
-model.save(file_name_prefix+'pruned_raw_weights.h5') 
-model.save(file_name_prefix+'checkpoint_raw_weights.h5') 
+#model.save(file_name_prefix+'raw_weights.h5') 
+#model.save(file_name_prefix+'pruned_raw_weights.h5') 
+#model.save(file_name_prefix+'checkpoint_raw_weights.h5') 
 
 # else load the previous run
-#model = tf.keras.models.load_model(file_name_prefix+'checkpoint_raw_weights.h5')
+model = tf.keras.models.load_model(file_name_prefix+'checkpoint_raw_weights.h5')
 model.summary()
+
 
 # Recompile the model
 compile(model)
@@ -201,7 +212,7 @@ for full_pass_id in range(1, num_of_full_passes + 1):
   escape_loop = False
 
   # list off the layers we are pruning and the order that we should prune them
-  prune_targets = ['conv_1']#, 'conv_2', 'dense_1']
+  prune_targets = ['conv_1', 'conv_2', 'dense_1']
   # suffle the list because sometimes it gets one layer pruned too much and that stops the rest
   random.shuffle(prune_targets)
   print("Starting Pass ", full_pass_id)
@@ -222,6 +233,7 @@ for full_pass_id in range(1, num_of_full_passes + 1):
 
       model.fit_generator(datagen, 
                           validation_data = test_batcher,
+                          validation_steps = 25,
                           steps_per_epoch=256, 
                           epochs=epochs,
                           verbose=keras_verbosity,
@@ -279,76 +291,23 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       layer = model.get_layer(name = prune_target)
      
       # set the Prune intensity to slowly increase as we go further 
-      prune_intensity = (float(full_pass_id) / float(num_of_full_passes)) + 0.05
+      prune_intensity = ((float(full_pass_id) / float(num_of_full_passes)) + 0.25) / 2.0
       print("Using pruning intensity: ", prune_intensity)
-
-
-      # Get the Output Indexes that are indicated as needing to be pruned
-      print("Starting Inverse Gradient identification using augmented data")
-
-      prune_layer_outputs_votes = []
-
-      # Using my inverse Gradient Method 
-      temp = identify_by_gradient.get_prune_by_gradient(model, layer, datagen, prune_intensity = prune_intensity, num_of_batches = num_of_batches)
-      print(len(temp))
-      prune_layer_outputs_votes = prune_layer_outputs_votes + list(temp)
-
-
+      
       start_time = time.time()
 
-      temp = identify_by_duplicate.get_duplicate_scores(model, layer, datagen, batch_size, num_of_batches = num_of_batches)
-      print(len(temp))
-      print(temp)
+      selected_to_prune = selector.get_selection(prune_intensity, model, layer)
 
-      print("get_duplicate_scores took %s seconds" % (time.time() - start_time))
-      print("get_duplicate_scores took per batch %s seconds" % float((time.time() - start_time) / num_of_batches))
+      print("Selecting layers took %s seconds" % (time.time() - start_time))
 
-      raise Exception("Forced stop")
-
-      #print(len(prune_layer_outputs_votes))
-      #print("Starting APOZ identification using augmented data")
-
-      # Get the Channel Ids that have a high APOZ (Average Percentage of Zeros) that should identify where we can prune
-      #temp = identify.high_apoz(identify.get_apoz(model, layer, datagen, num_of_batches = num_of_batches))
-      #print(len(temp))
-      #prune_layer_outputs_votes = prune_layer_outputs_votes + list(temp)
-      
-      #print(len(prune_layer_outputs_votes))
-      print("Starting Inverse Gradient identification using non-augmented data")
-
-      # Using my inverse Gradient Method 
-      temp = identify_by_gradient.get_prune_by_gradient(model, layer, train_batcher, prune_intensity = prune_intensity, num_of_batches = num_of_batches)
-      print(len(temp))
-      prune_layer_outputs_votes = prune_layer_outputs_votes + list(temp)
-     
-      
-      temp = identify_by_duplicate.get_duplicate_scores(model, layer, train_batcher, batch_size, num_of_batches = num_of_batches)
-      print(len(temp))
-      print(temp)
-
-      #print(len(prune_layer_outputs_votes))
-      print("Starting APOZ identification using non-augmented data")
-
-      # Get the Channel Ids that have a high APOZ (Average Percentage of Zeros) that should identify where we can prune
-      temp = identify.high_apoz(identify.get_apoz(model, layer, train_batcher, num_of_batches = num_of_batches))
-      print(len(temp))
-      prune_layer_outputs_votes = prune_layer_outputs_votes + list(temp)
-
-      #print(len(prune_layer_outputs_votes))
-      print("Finished identification for pruning process")
-
-      # prune all items with more than 1 vote
-      prune_outputs = list(set([x for x in prune_layer_outputs_votes if prune_layer_outputs_votes.count(x) > 1]))
-      print(len(prune_outputs))
-      print("Pruning out these layers based on votes:", prune_outputs)
-
+      print("Pruning out these layers based on votes:", selected_to_prune)
 
 
       # if there are only a few outputs to prune, lets move on to the next one. 
       # as we get deeper into the pruneing loops we lower the bar
-      if(len(prune_outputs) < (num_of_full_passes + 1 - full_pass_id) ):
+      if(len(selected_to_prune) <= 1):#(num_of_full_passes + 1 - full_pass_id) - 5 ):
                 
-        print("Outputs to prune were less than limit.", len(prune_outputs), (num_of_full_passes + 1 - full_pass_id))
+        print("Outputs to prune were less than limit.", len(selected_to_prune))# (num_of_full_passes + 1 - full_pass_id) - 5 )
 
         # Clear everything from memory
         del model
@@ -377,7 +336,7 @@ for full_pass_id in range(1, num_of_full_passes + 1):
       try:
 
           # Run the pruning on the Model and get the Pruned (uncompiled) model as a result
-          model = delete_channels(model, layer, prune_outputs)
+          model = delete_channels(model, layer, selected_to_prune)
 
       except Exception as ex:
 
@@ -421,10 +380,10 @@ for full_pass_id in range(1, num_of_full_passes + 1):
 # One final training to make sure it fits well
 model.fit_generator(datagen,
         validation_data = test_batcher,
+        validation_steps = 25,
         steps_per_epoch=256,
         epochs=epochs,
         verbose=1,
-        validation_data=(X_test, Y_test),
         callbacks = all_callbacks
         )
 
@@ -438,6 +397,7 @@ print("--- %s seconds ---" % (time.time() - start_time))
 # Print our 'Efficency' as the Accuracy / Total Time
 print("Efficency: ", score[1]/(time.time() - start_time))
 
+
 model.save(file_name_prefix+'pruned_model.h5')
 model.save_weights(file_name_prefix+'pruned_model_weights.h5')
 
@@ -445,8 +405,6 @@ model.save_weights(file_name_prefix+'pruned_model_weights.h5')
 # Clear everything from memory
 del model
 tf.keras.backend.clear_session()
-
-
 
 
 # Build a very small Dense net as an example

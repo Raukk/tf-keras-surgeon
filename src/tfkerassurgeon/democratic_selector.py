@@ -117,7 +117,7 @@ class DemocraticSelector:
         all_votes = self.__get_votes_for_all_generators(model, layer)
 
         # Sort the values and then get the output indexes of the sorted items
-        sorted_indexes = np.argsort(all_votes).flip() # flip because we want highest votes first
+        sorted_indexes = np.flip(np.argsort(all_votes)) # flip because we want highest votes first
 
         # this is the simplest way to use prune_intensity
         for index in sorted_indexes:
