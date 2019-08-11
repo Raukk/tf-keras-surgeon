@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{b9b64076-5e19-4737-96e7-ecf45a459612}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>src\tfkerassurgeon\examples\efficent_lenet_mnist.py</StartupFile>
+    <StartupFile>src\tfkerassurgeon\examples\rework_efficent_lenet_mnist.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -27,6 +27,7 @@
     <Compile Include="src\tfkerassurgeon\aggrigate_selector.py" />
     <Compile Include="src\tfkerassurgeon\democratic_selector.py" />
     <Compile Include="src\tfkerassurgeon\examples\compressed_mnist.py" />
+    <Compile Include="src\tfkerassurgeon\examples\rework_efficent_lenet_mnist.py" />
     <Compile Include="src\tfkerassurgeon\examples\example_data_loader.py">
       <SubType>Code</SubType>
     </Compile>

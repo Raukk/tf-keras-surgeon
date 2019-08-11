@@ -1,10 +1,14 @@
 
 # Imports
 import os
+os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import logging
+logging.getLogger('tensorflow').disabled = True
 
 import sys
+sys.path.append("../../")
 
 import time
 
@@ -12,11 +16,23 @@ import random
 
 import numpy as np 
 
-import tensorflow as tf
-
 import matplotlib.pyplot as plt    
 
-import keras
+import tensorflow as tf
+
+# set basic values
+print(tf.__version__)
+
+tf.enable_eager_execution()
+
+# this keeps it from getting a huge bite of GPU RAM at the start (mostly useful for figuring out memory usage)
+gpu_options = tf.GPUOptions(allow_growth=True)
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+tf.keras.backend.set_session(sess)
+
+import keras # for data load
+
+# Imports for pruning
 
 import tfkerassurgeon
 
@@ -30,32 +46,17 @@ from tfkerassurgeon.identify_by_gradient import InverseGradientIdentifier
 
 from tfkerassurgeon.operations import delete_channels
 
+import tensorflow_model_optimization as tfmot
 
-# set basic values
-print(tf.__version__)
-
-sys.path.append("../../")
-
-logging.getLogger('tensorflow').disabled = True
-
-os.environ['TF_CPP_MIN_VLOG_LEVEL'] = '3'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-
-gpu_options = tf.GPUOptions(allow_growth=True)
-sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-tf.keras.backend.set_session(sess)
-
-
-#sess = tf.Session(config=config)  #With the two options defined above
-
-#with tf.Session() as sess:
+from tensorflow_model_optimization.python.core.sparsity import keras as sparsity
 
 
 # Set some static values that can be tweaked to experiment
 # Constants
 
 file_name_prefix = "All_Pruning_1_"
+
+continue_old_run= False
 
 keras_verbosity = 0
 
@@ -73,17 +74,21 @@ cutoff_acc = 0.99
 
 num_of_batches = 10 # This is probably way to low to get a good value
 
+clipnorm_val = 2.0 # sets the parameter on the basic class.
+
 layers = tf.keras.layers
 
 all_callbacks = [
                     tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
                     tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', patience=2, cooldown=5)
                 ]
+print("Using ClipNorm of "+str(clipnorm_val))
 
 
-
+# Def helpers and iterators
 
 def grab_plain_batch(batch_size, X_train, Y_train):
+
     # get the files iterator
     size_batch = batch_size
     last_index = len(X_train) - 1
@@ -106,44 +111,47 @@ def grab_plain_batch(batch_size, X_train, Y_train):
 
 def compile(model):
 
-    new_adam = tf.keras.optimizers.Adam(clipnorm=2.0)
+    new_adam = tf.keras.optimizers.Adam(clipnorm=clipnorm_val)
 
     model.compile(optimizer=new_adam,
                     loss='categorical_crossentropy',
                     metrics=['accuracy'])
 
-print("Using ClipNorm of 2")
+def get_dataset():
+    # Get the MNIST Dataset
+
+    # Load the Dataset, they provided a nice helper that does all the network and downloading for you
+    (X_train, Y_train), (X_test, Y_test) = keras.datasets.mnist.load_data()
+    # This is an leterantive to the MNIST numbers dataset that is a computationlally harder problem
+    #(X_train, Y_train), (X_test, Y_test) = keras.datasets.fashion_mnist.load_data()
+
+    # we need to make sure that the images are normalized and in the right format
+    X_train = X_train.astype('float32')
+    X_test = X_test.astype('float32')
+    X_train /= 255
+    X_test /= 255
+
+    # expand the dimensions to get the shape to (samples, height, width, channels) where greyscale has 1 channel
+    X_train = np.expand_dims(X_train, axis=-1)
+    X_test = np.expand_dims(X_test, axis=-1)
+
+    # one-hot encoding, this way, each digit has a probability output
+    Y_train = keras.utils.np_utils.to_categorical(Y_train, nb_classes)
+    Y_test = keras.utils.np_utils.to_categorical(Y_test, nb_classes)
+
+    # log some basic details to be sure things loaded
+    #print()
+    #print('MNIST data loaded: train:',len(X_train),'test:',len(X_test))
+    #print('X_train:', X_train.shape)
+    #print('Y_train:', Y_train.shape)
+    #print('X_test:', X_test.shape)
+    #print('Y_test:', Y_test.shape)
+
+    return (X_train, Y_train), (X_test, Y_test)
 
 
-# Get the MNIST Dataset
-
-# Load the Dataset, they provided a nice helper that does all the network and downloading for you
-(X_train, Y_train), (X_test, Y_test) = keras.datasets.mnist.load_data()
-# This is an leterantive to the MNIST numbers dataset that is a computationlally harder problem
-#(X_train, Y_train), (X_test, Y_test) = keras.datasets.fashion_mnist.load_data()
-
-# we need to make sure that the images are normalized and in the right format
-X_train = X_train.astype('float32')
-X_test = X_test.astype('float32')
-X_train /= 255
-X_test /= 255
-
-# expand the dimensions to get the shape to (samples, height, width, channels) where greyscale has 1 channel
-X_train = np.expand_dims(X_train, axis=-1)
-X_test = np.expand_dims(X_test, axis=-1)
-
-# one-hot encoding, this way, each digit has a probability output
-Y_train = keras.utils.np_utils.to_categorical(Y_train, nb_classes)
-Y_test = keras.utils.np_utils.to_categorical(Y_test, nb_classes)
-
-# log some basic details to be sure things loaded
-print()
-print('MNIST data loaded: train:',len(X_train),'test:',len(X_test))
-#print('X_train:', X_train.shape)
-#print('Y_train:', Y_train.shape)
-#print('X_test:', X_test.shape)
-#print('Y_test:', Y_test.shape)
-
+# Build all the stuff we need
+(X_train, Y_train), (X_test, Y_test) = get_dataset()
 
 # Create a datagenerator 
 datagen = tf.keras.preprocessing.image.ImageDataGenerator(width_shift_range=4, height_shift_range=4, horizontal_flip=False, vertical_flip=False, fill_mode = 'constant', cval = 0.0)
@@ -156,18 +164,11 @@ datagen = datagen.flow(X_train, Y_train, batch_size=batch_size)
 train_batcher = grab_plain_batch(batch_size, X_train, Y_train)
 test_batcher = grab_plain_batch(batch_size, X_test, Y_test)
 
-identifiers = [#ApozIdentifier(),
-               DuplicateActivationIdentifier(batch_size),
-               InverseGradientIdentifier(0.15)]
+identifiers = [#ApozIdentifier(),# performance is too bad on this one. Needs a rewrite
+               DuplicateActivationIdentifier(batch_size),# perfomance of this one is'nt very good either
+               InverseGradientIdentifier(0.15)]# param here isn't used, needs to be cleaned up
 
 selector = DemocraticSelector(identifiers, [train_batcher, datagen], num_of_batches=10)
-
-# Lets print of the first image just to be sure everything loaded
-#first_batch = next(train_batcher)
-#print(np.argmax(first_batch[1][0]))
-
-#plt.imshow(np.squeeze(first_batch[0][0], axis=-1), cmap='gray', interpolation='none')
-#plt.show()
 
 
 # Build the model
@@ -188,23 +189,34 @@ model.add(layers.Dropout(0.25))
 #model.add(layers.BatchNormalization())
 model.add(layers.Dense(10, activation='softmax', name='dense_2'))
 
-compile(model)
-#model.summary()
 
 
-# We're going to loop through the pruning process multiple times
-# We're Going to prune them one layer at a time. 
-#model.save(file_name_prefix+'raw_weights.h5') 
-#model.save(file_name_prefix+'pruned_raw_weights.h5') 
-#model.save(file_name_prefix+'checkpoint_raw_weights.h5') 
+if (continue_old_run):
 
-# else load the previous run
-model = tf.keras.models.load_model(file_name_prefix+'checkpoint_raw_weights.h5')
-model.summary()
+    # load the previous run from a checkpoint
+    model = tf.keras.models.load_model(file_name_prefix+'checkpoint_raw_weights.h5')
+    model.summary()
+    # Compile the model
+    compile(model)
+
+else:
+
+    # We're going to loop through the pruning process multiple times
+    # We're Going to prune them one layer at a time. 
+    model.summary()
+    compile(model)
+    # Save the model as the current checkpoints 
+    model.save(file_name_prefix+'raw_weights.h5') 
+    model.save(file_name_prefix+'pruned_raw_weights.h5') 
+    model.save(file_name_prefix+'checkpoint_raw_weights.h5') 
 
 
-# Recompile the model
-compile(model)
+# Lets print of the first image just to be sure everything loaded
+#first_batch = next(train_batcher)
+#print(np.argmax(first_batch[1][0]))
+
+#plt.imshow(np.squeeze(first_batch[0][0], axis=-1), cmap='gray', interpolation='none')
+#plt.show()
 
 # run it through everything num_of_full_passes times for good measure
 for full_pass_id in range(1, num_of_full_passes + 1):
