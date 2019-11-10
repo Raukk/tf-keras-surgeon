@@ -1,6 +1,11 @@
 # Tf-Keras-Surgeon
 Note: This is a Port for TensorFlow.Keras, for the normal Keras version see the source Project Keras-Surgeon: https://github.com/BenWhetton/keras-surgeon
 
+## Installation
+
+```pip install tfkerassurgeon```
+
+
 ## Introduction
 This is a port of Keras-Surgeon by BenWhetton to work with the newer versions Tensorflow tf.keras and TF 2.0 which has a few differences from normal keras (which causes bugs).
 
@@ -12,7 +17,9 @@ I am working on getting it working for 1.14 and 2.0 Beta, but that will require 
 ### Quick Example:
 https://colab.research.google.com/gist/Raukk/49cbf50e564271a6b5f4fc596459d5e9/example_lenet_mnist.ipynb
 
+
 ## Goals:
+
 ### Current:
 This is not intended to do anything more than the original, so, most of the code and documentation will remain unchanged.
 It is primarily a port and Bug Fixes.
@@ -27,9 +34,7 @@ Modules like;
 
 
 
-
-
-
+# Note: this is the Unedited README from the Keras-Surgeon Project:
 # Keras-Surgeon README:
 
 ## Introduction
